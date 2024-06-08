@@ -1,0 +1,126 @@
+name: "Check new Files and apply to Kubernetes"
+description: "Checks files of the newest commit from fantasyflip/k8s-build-transfer and applies them to the Kubernetes cluster"
+author: "fantasyflip"
+
+inputs:
+  kubeconfig:
+    description: "Kubeconfig"
+    required: true
+  commit-file-pattern:
+    description: "File Pattern for tj-actions/changed-files@v44 to filter files to be applied"
+    required: false
+    default: "namespace/**/*.{yaml,yml,json}"
+  ghcr-username:
+    description: "GitHub Container Registry Username"
+    required: true
+  ghcr-email:
+    description: "GitHub Container Registry Email"
+    required: true
+  ghcr-token:
+    description: "GitHub Container Registry Token"
+    required: true
+  gh-token:
+    description: "GitHub Token"
+    required: true
+  set-cf-dns:
+    description: "Set Cloudflare DNS"
+    required: false
+    default: false
+  loadbalancer-ip:
+    description: "Loadbalancer IP"
+    required: false
+  cf-token:
+    description: "Cloudflare Token"
+    required: false
+  cf-zone-id:
+    description: "Cloudflare Zone ID"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Display inputs
+      shell: bash
+      run: |
+        echo "kubeconfig: ${{ inputs.kubeconfig }}"
+        echo "commit-file-pattern: ${{ inputs.commit-file-pattern }}"
+        echo "set-cf-dns: ${{ inputs.set-cf-dns }}"
+        echo "loadbalancer-ip: ${{ inputs.loadbalancer-ip }}"
+        echo "cf-token: ${{ inputs.cf-token }}"
+        echo "cf-zone-id: ${{ inputs.cf-zone-id }}"
+
+    - name: Checkout source repository
+      uses: actions/checkout@v3
+
+    - name: Checkout action repository
+      uses: actions/checkout@v3
+      with:
+        repository: fantasyflip/k8s-receive-apply
+        token: ${{ inputs.gh-token }}
+        path: action
+
+    - name: Create kubeconfig.yaml
+      shell: bash
+      run: |
+        echo "${{ inputs.kubeconfig }}" > kubeconfig.yaml
+
+    - name: Extract namespace from commit message
+      shell: bash
+      run: |
+        namespace=$(echo ${{github.event.head_commit.message}} | grep -oP '\[N=\K[^\]]+')
+        echo "RT_NAMESPACE=${namespace}" >> $GITHUB_ENV
+
+    - name: Extract hostname from commit message
+      if: ${{inputs.set-cf-dns}}
+      shell: bash
+      run: |
+        if echo ${{github.event.head_commit.message}} | grep -q '\[H=.*\]'; then
+          hostname=$(echo ${{github.event.head_commit.message}} | grep -oP '\[H=\K[^\]]+')
+          echo "RT_HOST=$hostname" >> $GITHUB_ENV
+        fi
+
+    - name: Check Namespace
+      shell: bash
+      if: ${{ env.RT_NAMESPACE != '' }}
+      run: |
+        # Set the namespace you want to check
+        namespace=${RT_NAMESPACE}
+        echo "Checking for namespace $namespace"
+
+        # Check if the namespace exists
+        if kubectl --kubeconfig=./kubeconfig.yaml get namespace $namespace &> /dev/null; then
+          echo "Namespace $namespace exists"
+        else
+          echo "Namespace $namespace does not exist. Creating now..."
+          # You can choose to create the namespace here if needed
+          kubectl --kubeconfig=./kubeconfig.yaml create namespace $namespace
+          echo "Adding secret for ghcr.io to namespace $namespace..."
+          kubectl --kubeconfig=./kubeconfig.yaml create secret docker-registry ghcr-secret --docker-server=https://ghcr.io --docker-username=${{inputs.ghcr-username}} --docker-password=${{inputs.ghcr-token}} --docker-email=${{inputs.ghcr-email}} -n $namespace
+        fi
+
+    - name: Get changed files
+      id: changed-files
+      uses: tj-actions/changed-files@v44
+      with:
+        files: ${{ inputs.commit-file-pattern }}
+
+    - name: Apply changed files to Kubernetes
+      shell: bash
+      env:
+        ALL_CHANGED_FILES: ${{ steps.changed-files.outputs.all_changed_files }}
+      run: |
+        for file in ${ALL_CHANGED_FILES}; do
+          echo "Applying $file"
+          kubectl --kubeconfig=./kubeconfig.yaml apply -f $file -n ${RT_NAMESPACE}
+        done
+
+    - name: Set Cloudflare DNS
+      uses: infraway/create-dns-record@v2.0
+      if: ${{ inputs.set-cf-dns && env.HOST && inputs.loadbalancer-ip && inputs.cf-token && inputs.cf-zone-id }}
+      with:
+        type: "A"
+        name: ${{ env.RT_HOST }}
+        content: ${{inputs.loadbalancer-ip}}
+        proxied: true
+        token: ${{ inputs.cf-token }}
+        zone: ${{ inputs.cf-zone-id }}
