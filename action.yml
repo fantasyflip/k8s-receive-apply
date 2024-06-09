@@ -42,7 +42,6 @@ runs:
     - name: Display inputs
       shell: bash
       run: |
-        echo "kubeconfig: ${{ inputs.kubeconfig }}"
         echo "commit-file-pattern: ${{ inputs.commit-file-pattern }}"
         echo "set-cf-dns: ${{ inputs.set-cf-dns }}"
         echo "loadbalancer-ip: ${{ inputs.loadbalancer-ip }}"
@@ -116,7 +115,7 @@ runs:
 
     - name: Set Cloudflare DNS
       uses: infraway/create-dns-record@v2.0
-      if: ${{ inputs.set-cf-dns && env.HOST && inputs.loadbalancer-ip && inputs.cf-token && inputs.cf-zone-id }}
+      if: ${{ inputs.set-cf-dns && env.RT_HOST && inputs.loadbalancer-ip && inputs.cf-token && inputs.cf-zone-id }}
       with:
         type: "A"
         name: ${{ env.RT_HOST }}
