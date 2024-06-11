@@ -66,15 +66,15 @@ runs:
     - name: Extract namespace from commit message
       shell: bash
       run: |
-        namespace=$(echo ${{github.event.head_commit.message}} | grep -oP '\[N=\K[^\]]+')
+        namespace=$(echo "${{github.event.head_commit.message}}" | grep -oP '\[N=\K[^\]]+')
         echo "RT_NAMESPACE=${namespace}" >> $GITHUB_ENV
 
     - name: Extract hostname from commit message
       if: ${{inputs.set-cf-dns}}
       shell: bash
       run: |
-        if echo ${{github.event.head_commit.message}} | grep -q '\[H=.*\]'; then
-          hostname=$(echo ${{github.event.head_commit.message}} | grep -oP '\[H=\K[^\]]+')
+        if echo "${{github.event.head_commit.message}}" | grep -q '\[H=.*\]'; then
+          hostname=$(echo "${{github.event.head_commit.message}}" | grep -oP '\[H=\K[^\]]+')
           echo "RT_HOST=$hostname" >> $GITHUB_ENV
         fi
 
