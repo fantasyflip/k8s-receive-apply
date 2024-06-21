@@ -110,7 +110,7 @@ runs:
       run: |
         for file in ${ALL_CHANGED_FILES}; do
           echo "Applying $file"
-          kubectl --kubeconfig=./kubeconfig.yaml apply -f $file -n ${RT_NAMESPACE}
+          kubectl --kubeconfig=./kubeconfig.yaml apply -f $file -n ${RT_NAMESPACE} || true
         done
 
     - name: Set Cloudflare DNS
