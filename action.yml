@@ -54,9 +54,15 @@ runs:
     - name: Checkout action repository
       uses: actions/checkout@v3
       with:
-        repository: fantasyflip/k8s-receive-apply
+        repository: fantasyflip/priv_k8s-receive-apply
         token: ${{ inputs.gh-token }}
         path: action
+
+    - name: Install action dependencies
+      shell: bash
+      run: |
+        cd action
+        npm install
 
     - name: Create kubeconfig.yaml
       shell: bash
@@ -115,13 +121,21 @@ runs:
           fi
         done
 
+    - name: Get Cloudflare Zone ID
+      if: ${{ inputs.set-cf-dns && env.RT_HOST }}
+      id: cf-zone-id
+      uses: ./action/actions/getZoneId/
+      with:
+        cf-token: ${{ inputs.cf-token }}
+        host: ${{ env.RT_HOST }}
+
     - name: Set Cloudflare DNS
       uses: infraway/create-dns-record@v2.0
-      if: ${{ inputs.set-cf-dns && env.RT_HOST && inputs.loadbalancer-ip && inputs.cf-token && inputs.cf-zone-id }}
+      if: ${{ inputs.set-cf-dns && env.RT_HOST && inputs.loadbalancer-ip && inputs.cf-token && env.RT_ZONE_ID }}
       with:
         type: "A"
         name: ${{ env.RT_HOST }}
         content: ${{inputs.loadbalancer-ip}}
         proxied: true
         token: ${{ inputs.cf-token }}
-        zone: ${{ inputs.cf-zone-id }}
+        zone: ${{ env.RT_ZONE_ID }}

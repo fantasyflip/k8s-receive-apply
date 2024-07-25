@@ -1,0 +1,15 @@
+name: "getZoneId"
+description: "Get Cloudflare Zone ID for supplied host"
+author: "fantasyflip"
+
+inputs:
+  host:
+    required: true
+    description: "Host for which to get Zone ID"
+  cf-token:
+    required: true
+    description: "Cloudflare Token for API"
+
+runs:
+  using: "node16"
+  main: "getZoneId.js"
