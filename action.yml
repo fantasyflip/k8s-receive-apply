@@ -32,9 +32,6 @@ inputs:
   cf-token:
     description: "Cloudflare Token"
     required: false
-  cf-zone-id:
-    description: "Cloudflare Zone ID"
-    required: false
 
 runs:
   using: "composite"
